@@ -9,7 +9,7 @@ logmsg() { echo "$(date '+%Y-%m-%d %H:%M:%S'): $*" ; }
 # -------------------------------------------------------------------------------------------------------
 # Validate project and its directory
 # -------------------------------------------------------------------------------------------------------
-project_dir(){
+get_project_dir(){
     local project=$1
     local dir
 
@@ -170,5 +170,119 @@ index_genome(){
             return 1
         fi
     fi
+}
+
+# Directory names
+reads_name="01_raw_reads"
+fastp_name="02_fastp_trim"
+fastqc_name="03_fastqc"
+trim_reads_name="trim_reads"
+reports_name="reports"
+
+trim_reads(){
+    local project=$1
+    local project_dir
+    project_dir=$(get_project_dir ${project}) || return 1
+    local raw_reads_dir=${project_dir}/${reads_name}
+    local fastp_dir=${project_dir}/${fastp_name}
+    local trim_dir=${fastp_dir}/${trim_reads_name}
+    local report_dir=${fastp_dir}/${reports_name}
+    local summary=${report_dir}/fastp_summary.tsv
+
+    create_dir ${trim_dir} ${report_dir} || return 1
+
+    # Initialize summary file 
+    if [[ ! -s ${summary} ]]; then
+        # Add a header to the summary file
+        echo -e "Sample\tRead_Type\tTotal_Reads_Before\tGC_Content_Before\tTotal_Reads_After\t\
+        GC_Content_After\tPassed_Filter_Reads\tLow_Quality_Reads\tToo_Many_N_Reads\t\
+        Too_Short_Reads\tDuplication_Rate\tInsert_Size_Peak" > ${summary}
+
+        logmsg "Summary file created: ${summary}"
+    fi
+
+    local R1
+    for R1 in ${raw_reads_dir}/*_R1.fq.gz; do
+        local fname=$(basename ${R1})
+
+        local sbase=${fname%_R1.fq.gz}
+        local R2=${raw_reads_dir}/${sbase}_R2.fq.gz
+        local O1=${trim_dir}/${sbase}_trim_R1.fq.gz
+        local O2=${trim_dir}/${sbase}_trim_R2.fq.gz
+        local ht=${report_dir}/${sbase}_fastp_report.html
+        local jt=${report_dir}/${sbase}_fastp_report.json
+        local metrics=""
+        local read_type
+
+        # Check matching R2
+        if [[ -s "${R2}" ]]; then
+            read_type="PE"
+        else
+            read_type="SE"
+        fi
+
+        # Skip if already summarized
+        if awk -F '\t' -v sample="${sbase}" -v type="${read_type}" '
+            NR > 1 && $1 == sample && $2 == type && NF == 12 {found = 1}
+            END {exit !found}
+        ' "${summary}"; then
+            logmsg "${sbase} already completed. Skipping."
+            continue
+        fi
+
+        # Run fastp
+        if [[ ${read_type} == "PE" ]]; then
+            if [[ ! -s "${O1}" || ! -s "${O2}" || ! -s "${jt}" ]]; then
+                if fastp -i ${R1} -I ${R2} -o ${O1} -O ${O2} --detect_adapter_for_pe \
+                    --thread ${threads} -h ${ht} -j ${jt}; then
+                    logmsg "fastp complete for ${sbase}"
+                else
+                    logmsg "ERROR : fastp failed ${sbase}"
+                    continue
+                fi
+            else
+                logmsg "$(basename "${O1}") and $(basename "${O1}") already exist and trimmed. skip fastp..."
+                
+            fi
+
+         else
+
+            if [[ ! -s "${O1}" || ! -s "${jt}" ]]; then
+                if fastp -i ${R1} -o ${O1} --thread ${threads} -h ${ht} -j ${jt} ; then
+                    logmsg "fastp complete for ${sbase}"
+                else
+                    logmsg "ERROR : fastp failed ${sbase}"
+                    continue
+                fi
+            else
+                logmsg "$(basename "${O1}") already exists and is trimmed. Skipping fastp..."
+            fi
+        fi
+
+        # Extract fastp metrics
+        if [[ -s "${jt}" ]]; then
+            metrics="$(
+                jq -r '
+                    [.summary.before_filtering.total_reads, .summary.before_filtering.gc_content,
+                    .summary.after_filtering.total_reads, .summary.after_filtering.gc_content,
+                    .filtering_result.passed_filter_reads, .filtering_result.low_quality_reads,
+                    .filtering_result.too_many_N_reads, .filtering_result.too_short_reads,
+                    .duplication.rate, .insert_size.peak ] | @tsv' "${jt}"
+                )" || metrics=""
+        fi
+
+        # Check metrics
+        if [[ -z "${metrics}" ]]; then
+            logmsg "ERROR: Could not extract fastp metrics for ${sbase}"
+            continue
+        fi
+
+        # Add summary row
+        echo -e "${sbase}\t${read_type}\t${metrics}" >> "${summary}"
+
+        logmsg "fastp complete for ${sbase} (${read_type})"
+    done
+
+     logmsg "Read trimming completed for project: ${project}"
 }
 
