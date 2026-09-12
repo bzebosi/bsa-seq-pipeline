@@ -175,7 +175,6 @@ index_genome(){
 # Directory names
 reads_name="01_raw_reads"
 fastp_name="02_fastp_trim"
-fastqc_name="03_fastqc"
 trim_reads_name="trim_reads"
 reports_name="reports"
 
@@ -245,7 +244,7 @@ trim_reads(){
                 
             fi
 
-         else
+        else
 
             if [[ ! -s "${O1}" || ! -s "${jt}" ]]; then
                 if fastp -i ${R1} -o ${O1} --thread ${threads} -h ${ht} -j ${jt} ; then
@@ -283,6 +282,8 @@ trim_reads(){
         logmsg "fastp complete for ${sbase} (${read_type})"
     done
 
-     logmsg "Read trimming completed for project: ${project}"
+    logmsg "Read trimming completed for project: ${project}"
 }
+
+#
 
