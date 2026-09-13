@@ -128,7 +128,7 @@ index_genome(){
     # index the genome using minimap2
     logmsg "Starting Minimap2 indexing for ${genome}.."
     if [[ -s ${mmi} ]]; then
-        logmsg "Minimap2 index already exists for ${gbase} - skipping"
+        logmsg "Minimap2 index already exists for ${gbase} - skipping indexing"
     else
         logmsg "Building minimap2 index for ${gbase}..."
         if minimap2 -t ${threads} -d ${mmi} ${genome} ; then
@@ -172,9 +172,14 @@ index_genome(){
     fi
 }
 
+
+# -------------------------------------------------------------------------------------------------------
+# trim read
+# -------------------------------------------------------------------------------------------------------
+
 # Directory names
-reads_name="01_raw_reads"
-fastp_name="02_fastp_trim"
+reads_name="raw_reads"
+fastp_name="fastp_trim"
 trim_reads_name="trim_reads"
 reports_name="reports"
 
@@ -285,5 +290,163 @@ trim_reads(){
     logmsg "Read trimming completed for project: ${project}"
 }
 
-#
+# -------------------------------------------------------------------------------------------------------
+# Map Reads 
+# -------------------------------------------------------------------------------------------------------
+map_reads(){
+    local project=$1
+    local gbase=$2
+    local project_dir
+    project_dir=$(get_project_dir "${project}") || return 1
+    local trim_dir=${project_dir}/${fastp_name}/${trim_reads_name}
+    local idx_dir=${ref_dir}/indexes
+    local bam_dir=${project_dir}/${bam}
+    local stats_dir=${project_dir}/${stats}
+    local reports_dir=${stats_dir}/${reports}
+    local plots_dir=${stats_dir}/${plots}
 
+
+    create_dir "${bam_dir}" "${stats_dir}" "${reports_dir}" "${plots_dir}" || return 1
+    # create reference paths
+    local idx_mmi=${idx_dir}/${gbase}.mmi
+    local genome_fa=${idx_dir}/${gbase}.fa
+
+    if [[ -s "${idx_mmi}" && -s "${genome_fa}" ]]; then
+        logmsg "Using index: ${idx_mmi} and FASTA: ${genome_fa}"
+    else
+        logmsg "Error: index or FASTA missing for ${gbase}"
+        return 1
+    fi
+
+    # Check if overall coverage file exists, create if missing
+    local overall_coverage="${stats_dir}/overall_coverage.tsv"
+
+    # Initialize coverage summary
+    if [[ ! -s "${overall_coverage}" ]]; then
+        if echo -e "Genome\tSample\tRead_Type\tCoverage\tTotal_Reads\tMapped_Reads\t\
+            Properly_Paired\tMapped_%" > "${overall_coverage}"; then
+
+            logmsg "Successfully created ${overall_coverage}"
+        else
+            logmsg "Error creating ${overall_coverage}"
+            return 1
+        fi
+    fi
+
+    local O1
+
+    for O1 in "${trim_dir}"/*_trim_R1.fq.gz; do
+        local sbase=$(basename "${O1}" "_trim_R1.fq.gz")
+        local O2=${trim_dir}/${sbase}_trim_R2.fq.gz
+        local tag=${gbase}_${sbase}
+        local bam_out=${bam_dir}/${tag}.bam
+        local read_type
+
+        # check if paired or single end
+        if [[ -s "${O2}" ]]; then
+            read_type="PE"
+        else
+            read_type="SE"
+        fi
+
+        # Run Minimap2 alignmenT
+
+        # Skip if BAM and BAM index already exists
+        if [[ -s "${bam_out}" && -s "${bam_out}.bai" ]]; then
+            logmsg "${sbase} already mapped to ${gbase}. Skipping mapping"
+        fi
+
+        
+        # Map paired-end reads
+        if [[ "${read_type}" == "PE" ]]; then
+            logmsg "PE mapping ${sbase} to ${gbase} started"
+
+            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" "${O2}" |
+                samtools sort -@ "${threads}" -o "${bam_out}"; then
+
+                logmsg "PE alignment and sorting of ${bam_out} completed"
+            else
+                logmsg "ERROR: PE mapping failed for ${bam_out}"
+                continue
+            fi
+        
+        # Map single-end reads
+        else
+            logmsg "SE mapping ${sbase} to ${gbase} started"
+
+            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" |
+                samtools sort -@ "${threads}" -o "${bam_out}"; then
+
+                logmsg "SE alignment and sorting for ${bam_out} completed"
+            else
+                logmsg "ERROR: SE mapping failed for ${bam_out}"
+                continue
+            fi
+        fi
+
+        # Index BAM file
+        logmsg "samtools indexing ${bam_out} started"
+
+        if samtools index "${bam_out}"; then
+            logmsg "${bam_out} successfully indexed"
+        else
+            logmsg "Indexing of ${bam_out} failed"
+            continue
+        fi
+
+        logmsg "Read mapping completed for ${sbase}"
+
+        if awk -F '\t' -v genome="${gbase}" -v sample="${sbase}" \
+            '$1 == genome && $2 == sample {found=1} END {exit !found}'\
+            "${overall_coverage}"; then
+
+            logmsg "Coverage for ${tag} already present. Skipping stats.."
+        else
+            # Run samtools flagstat and extract relevant values
+            local stats total_reads mapped_reads properly_paired depth
+
+            logmsg "Flagstat for ${bam_out}"
+            stats=$(samtools flagstat "${bam_out}")
+
+            # Extract read statistics
+            total_reads=$(echo "${stats}" |
+            awk '/in total/ {print $1; exit}')
+
+            mapped_reads=$(echo "${stats}" |
+            awk '$4 == "mapped" {print $1; exit}')
+
+            if [[ ${read_type} == "PE" ]]; then
+                properly_paired=$(echo "${stats}" |
+                    awk '/properly paired/ {print $1; exit}')
+            else
+                # For single-end data, paired reads are not applicable
+                properly_paired="NA"
+            fi
+
+            # Check read statistics
+            if [[ -z "${total_reads}" || -z "${mapped_reads}" || "${total_reads}" -eq 0 ]]; then
+                logmsg "Error: Could not retrieve valid read statistics for ${bam_out}"
+                continue
+            fi
+
+            local alignment_percentage
+            if alignment_percentage=$(awk -v total="${total_reads}" -v mapped="${mapped_reads}" \
+                'BEGIN {printf "%.2f", (mapped/total)*100}'); then
+                logmsg "Aignment percentage calculated"
+            fi
+
+            # compute coverage depth using samtoools - depth
+            logmsg "computing coverage depth ${bam_out} started"
+            if depth=$(samtools depth -a ${bam_out} | awk '{sum+=$3} END { print sum/NR }'); then 
+                logmsg "Coverage calculated for ${bam_out}: ${depth}x"
+            else
+                logmsg "Coverage calculation failed for ${bam_out}" &&  exit 1
+            fi
+
+            # Append structured tab-separated results
+            echo -e "${gbase}\t${sbase}\t${read_type}\t${depth}\t${total_reads}\t\
+            ${mapped_reads}\t${properly_paired}\t${alignment_percentage}" >> "${overall_coverage}"
+        fi
+
+    done
+}
