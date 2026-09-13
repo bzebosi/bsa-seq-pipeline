@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# load your settings:
+# Load configuration
 source "$(dirname "$0")/variant_config.sh"
+
+# Fail a pipeline if any command in it fails
+set -o pipefail
 
 # -------------------------------------------------------------------------------------------------------
 # log functions for updates and status
@@ -14,7 +17,7 @@ logmsg() { echo "$(date '+%Y-%m-%d %H:%M:%S'): $*" ; }
 # -------------------------------------------------------------------------------------------------------
 get_project_dir(){
     local project=$1
-    local dir
+    local dir=${sample_loc[$project]:-}
 
     # check if the project was provided
     if [[ -z ${project} ]]; then
@@ -22,12 +25,9 @@ get_project_dir(){
         return 1
     fi 
     
-    # Build the project directory path
-    dir="${base_dir}/${project}"
-    
     # check if the project directory exits
     if [[ -d ${dir} ]]; then
-        logmsg ${dir} 
+        echo ${dir} 
     else
         logmsg "Error: Project directory does not exit ${dir}"
         return 1
@@ -181,8 +181,8 @@ index_genome(){
 # -------------------------------------------------------------------------------------------------------
 
 # Directory names
-reads_name="raw_reads"
-fastp_name="fastp_trim"
+reads_name="reads"
+fastp_name="fastp"
 trim_reads_name="trim_reads"
 reports_name="reports"
 
@@ -610,30 +610,30 @@ map_reads(){
 
 # before any samples…
 for gx in "${goi[@]}"; do
-    download_genome "$gx"
-    index_genome   "$gx"
+    download_genome "${gx}"
+    index_genome   "${gx}"
 done
 
 # trim once per sample
-for sx in "${files[@]}"; do
-    if sample_dir="$(get_sample_dir "$sx")"; then
-        logmsg "$sx ready (dir: $sample_dir)"
-        trim_reads "$sx"
+for sx in "${samples[@]}"; do
+    if project_dir="$(get_project_dir "${sx}")"; then
+        logmsg "${sx} ready (dir: ${project_dir})"
+        trim_reads "${sx}"
     else
-        logmsg "Skipping '$sx' — missing/empty in sample_loc"
+        logmsg "Skipping '${sx}' — missing/empty in sample_loc"
     fi
 done
 
 
 # genome mapping
 for gx in "${goi[@]}"; do
-    logmsg "Mapping all samples to genome: $gx"
+    logmsg "Mapping all samples to genome: ${gx}"
 
-    for sx in "${files[@]}"; do
-        if sample_dir="$(get_sample_dir "$sx")"; then
-            map_reads "$sx" "$gx"
+    for sx in "${samples[@]}"; do
+        if project_dir="$(get_project_dir "${sx}")"; then
+            map_reads "${sx}" "${gx}"
         else
-            logmsg "Skipping '$sx' — missing/empty in sample_loc"
+            logmsg "Skipping '${sx}' — missing/empty in sample_loc"
         fi
     done
 done

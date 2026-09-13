@@ -3,6 +3,8 @@
 # VARIANT CALLING CONFIG
 # ============================================================================================================================
 
+# Uses Slurm allocation if available, otherwise defaults to 8
+threads=${SLURM_CPUS_PER_TASK:-8}
 
 # Run structural variant calling with Manta
 sv_call="true" # set to "false" to skip structural variant calling
@@ -42,7 +44,6 @@ declare -A genome_urls=(
 # ---------------------------------------------------------------------------------------------------------------------------------
 declare -A sample_loc=(
     [q1]="/nfs5/BPP/Leiboff_Lab/Brian/bsa/bds1_ts"
-
 )
 
 
