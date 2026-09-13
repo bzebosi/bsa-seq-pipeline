@@ -529,5 +529,108 @@ map_reads(){
                 continue
             fi
         fi
+
+        if [[ ${sv_call} == "true" ]]; then
+            local manta_dir=${svs_dir}/${manta_svs}
+            local manta_run="${manta_dir}/${tag}_svs"
+
+            # make sure all dirs exist
+            create_dir "${manta_dir}" "${svs_vcf}" "${svs_tsv}" "${manta_run}" || return 1
+
+            # Structural variant calling with Manta
+            logmsg "Running Manta for: ${tag} started."
+
+            local vcfs=( "$manta_run"/results/variants/*.vcf.gz )
+
+            if [[ -f "${vcfs[0]}" ]]; then
+                logmsg "Manta SVs already exist for ${tag}, skipping Manta."
+            else
+                logmsg "No SV VCFs found — running Manta."
+                # Configure Manta and run manta
+                if ! configManta.py --bam ${bam_out} --referenceFasta "${genome_fa}" \
+                    --runDir ${manta_run} > "${manta_run}/configManta_${tag}.log" 2>&1; then
+                    logmsg "Manta configuration failed for ${tag}."
+                    continue
+                fi
+
+                if ! ${manta_run}/runWorkflow.py -m local -j ${threads} > "${manta_run}/mantaWorkflow_${tag}.log" 2>&1; then
+                    logmsg "Manta workflow failed. Check log: ${manta_run}/mantaWorkflow_${tag}.log"
+                    continue
+                fi
+            fi
+
+            # copy VCFs
+            local vrt_dir="${manta_run}/results/variants"
+            for svf in candidateSmallIndels.vcf.gz candidateSmallIndels.vcf.gz.tbi \
+                candidateSV.vcf.gz candidateSV.vcf.gz.tbi diploidSV.vcf.gz diploidSV.vcf.gz.tbi; do  
+
+                local source="${vrt_dir}/${svf}"
+                local destination="${svs_vcf}/${tag}_${svf}"
+
+                if [[ -e "${destination}" ]] ; then  
+                    logmsg "${destination} already exists—skipping copy."
+                else
+                    if ! cp "${source}" "${destination}"; then 
+                        logmsg "Failed to copy ${source}"
+                        continue
+                    fi
+                fi
+            done
+
+            # Extract important SV fields
+            local vf
+            for vf in "${svs_vcf}"/*.vcf.gz; do
+                local sv_tsv=${svs_tsv}/$(basename ${vf} .vcf.gz).tsv
+                
+                logmsg "Extracting important SV info from: $(basename ${sv_tsv})"
+                # Add headers and extract fields
+                if [[ -s ${sv_tsv} ]] ; then
+                    logmsg "${sv_tsv} already exists—skipping."
+                else
+                    echo -e "CHROM\tPOS\tREF\tALT\tQUAL\tFILTER\tSVTYPE\tSVLEN\tEND" > ${sv_tsv}
+                    # decompress .vcf.gz and Extract specific fields from the diplodVCF file
+                    if bgzip -d -c "${vf}" \
+                        | grep -E '^#|^chr[0-9]+\b' \
+                        | bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO/SVTYPE\t%INFO/SVLEN\t%INFO/END\n' >> "${sv_tsv}"; then
+                        
+                        logmsg "$(basename "${sv_tsv}") successfully created."
+                    else
+                        logmsg "$(basename "${sv_tsv}") failed"
+                    fi
+                fi
+            done
+        else
+            logmsg "Structural Variant calling for ${tag} not needed. ...skipping."
+        fi
     done
 }
+
+# before any samples…
+for gx in "${goi[@]}"; do
+    download_genome "$gx"
+    index_genome   "$gx"
+done
+
+# trim once per sample
+for sx in "${files[@]}"; do
+    if sample_dir="$(get_sample_dir "$sx")"; then
+        logmsg "$sx ready (dir: $sample_dir)"
+        trim_reads "$sx"
+    else
+        logmsg "Skipping '$sx' — missing/empty in sample_loc"
+    fi
+done
+
+
+# genome mapping
+for gx in "${goi[@]}"; do
+    logmsg "Mapping all samples to genome: $gx"
+
+    for sx in "${files[@]}"; do
+        if sample_dir="$(get_sample_dir "$sx")"; then
+            map_reads "$sx" "$gx"
+        else
+            logmsg "Skipping '$sx' — missing/empty in sample_loc"
+        fi
+    done
+done
