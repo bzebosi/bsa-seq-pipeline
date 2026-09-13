@@ -235,7 +235,7 @@ trim_reads(){
         fi
 
         # Run fastp
-        if [[ ${read_type} == "PE" ]]; then
+        if [[ "${read_type}" == "PE" ]]; then
             if [[ ! -s "${O1}" || ! -s "${O2}" || ! -s "${jt}" ]]; then
                 if fastp -i ${R1} -I ${R2} -o ${O1} -O ${O2} --detect_adapter_for_pe \
                     --thread ${threads} -h ${ht} -j ${jt}; then
@@ -304,9 +304,16 @@ map_reads(){
     local stats_dir=${project_dir}/${stats}
     local reports_dir=${stats_dir}/${reports}
     local plots_dir=${stats_dir}/${plots}
+    local variant_dir=${project_dir}/${variants}
+    local snps_dir=${variant_dir}/${snps}
+    local snps_vcf=${snps_dir}/${snps_vcf}
+    local snps_tsv=${snps_dir}/${snps_tsv}
+    local svs_dir=${variant_dir}/${svs}
+    local svs_vcf=${svs_dir}/${svs_vcf}
+    local svs_tsv=${svs_dir}/${svs_tsv}
 
-
-    create_dir "${bam_dir}" "${stats_dir}" "${reports_dir}" "${plots_dir}" || return 1
+    create_dir "${bam_dir}" "${stats_dir}" "${reports_dir}" "${plots_dir}" "${variant_dir}" || return 1
+    create_dir "${snps_dir}" "${snps_vcf}" "${snps_tsv}" "${svs_dir}" "${svs_vcf}" "${svs_tsv}" || return 1
     # create reference paths
     local idx_mmi=${idx_dir}/${gbase}.mmi
     local genome_fa=${idx_dir}/${gbase}.fa
@@ -340,6 +347,7 @@ map_reads(){
         local tag=${gbase}_${sbase}
         local bam_out=${bam_dir}/${tag}.bam
         local read_type
+        local vcf_out=${snps_vcf}/${tag}.vcf.gz
 
         # check if paired or single end
         if [[ -s "${O2}" ]]; then
@@ -348,53 +356,60 @@ map_reads(){
             read_type="SE"
         fi
 
-        # Run Minimap2 alignmenT
+        # Run Minimap2 alignment
 
         # Skip if BAM and BAM index already exists
-        if [[ -s "${bam_out}" && -s "${bam_out}.bai" ]]; then
+        if [[ -s "${bam_out}" ]]; then
             logmsg "${sbase} already mapped to ${gbase}. Skipping mapping"
-        fi
 
-        
-        # Map paired-end reads
-        if [[ "${read_type}" == "PE" ]]; then
-            logmsg "PE mapping ${sbase} to ${gbase} started"
+            if [[ ! -s "${bam_out}.bai" ]]; then
+                logmsg "BAM index missing. Indexing ${bam_out}"
 
-            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" "${O2}" | samtools sort -@ "${threads}" -o "${bam_out}"; then
+                if ! samtools index "${bam_out}"; then
+                    logmsg "Indexing of ${bam_out} failed"
+                continue
+                fi
+            fi
 
-                logmsg "PE alignment and sorting of ${bam_out} completed"
+        else
+            # Map paired-end reads
+            if [[ "${read_type}" == "PE" ]]; then
+                logmsg "PE mapping ${sbase} to ${gbase} started"
+
+                if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" "${O2}" | samtools sort -@ "${threads}" -o "${bam_out}"; then
+                    logmsg "PE alignment and sorting of ${bam_out} completed"
+                else
+                    logmsg "ERROR: PE mapping failed for ${bam_out}"
+                    continue
+                fi
+            # Map single-end reads
             else
-                logmsg "ERROR: PE mapping failed for ${bam_out}"
+                logmsg "SE mapping ${sbase} to ${gbase} started"
+
+                if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" | samtools sort -@ "${threads}" -o "${bam_out}"; then
+
+                    logmsg "SE alignment and sorting for ${bam_out} completed"
+                else
+                    logmsg "ERROR: SE mapping failed for ${bam_out}"
+                    continue
+                fi
+            fi
+
+            # Index BAM file
+            logmsg "samtools indexing ${bam_out} started"
+
+            if samtools index "${bam_out}"; then
+                logmsg "${bam_out} successfully indexed"
+            else
+                logmsg "Indexing of ${bam_out} failed"
                 continue
             fi
-        
-        # Map single-end reads
-        else
-            logmsg "SE mapping ${sbase} to ${gbase} started"
-
-            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" | samtools sort -@ "${threads}" -o "${bam_out}"; then
-
-                logmsg "SE alignment and sorting for ${bam_out} completed"
-            else
-                logmsg "ERROR: SE mapping failed for ${bam_out}"
-                continue
-            fi
-        fi
-
-        # Index BAM file
-        logmsg "samtools indexing ${bam_out} started"
-
-        if samtools index "${bam_out}"; then
-            logmsg "${bam_out} successfully indexed"
-        else
-            logmsg "Indexing of ${bam_out} failed"
-            continue
         fi
 
         logmsg "Read mapping completed for ${sbase}"
 
-        if awk -F '\t' -v genome="${gbase}" -v sample="${sbase}" '$1 == genome && $2 == sample {found=1} END {exit !found}'\
-            "${overall_coverage}"; then
+        if awk -F '\t' -v genome="${gbase}" -v sample="${sbase}" \
+            '$1 == genome && $2 == sample {found=1} END {exit !found}' "${overall_coverage}"; then
 
             logmsg "Coverage for ${tag} already present. Skipping stats.."
         else
@@ -423,21 +438,96 @@ map_reads(){
             fi
 
             local alignment_percentage
-            if alignment_percentage=$(awk -v total="${total_reads}" -v mapped="${mapped_reads}" 'BEGIN {printf "%.2f", (mapped/total)*100}'); then
-                logmsg "Aignment percentage calculated"
+            if alignment_percentage=$(awk -v total="${total_reads}" -v mapped="${mapped_reads}" \
+                'BEGIN {printf "%.2f", (mapped/total)*100}'); then
+                logmsg "Alignment percentage calculated"
             fi
 
             # compute coverage depth using samtoools - depth
             logmsg "computing coverage depth ${bam_out} started"
-            if depth=$(samtools depth -a ${bam_out} | awk '{sum+=$3} END { print sum/NR }'); then 
+            if depth=$(samtools depth -a "${bam_out}" |
+                awk '{sum += $3} END {if (NR > 0) printf "%.2f", sum / NR; else print 0}'); then
+
                 logmsg "Coverage calculated for ${bam_out}: ${depth}x"
             else
-                logmsg "Coverage calculation failed for ${bam_out}" &&  exit 1
+                logmsg "Coverage calculation failed for ${bam_out}"
+                continue
             fi
 
             # Append structured tab-separated results
             echo -e "${gbase}\t${sbase}\t${read_type}\t${depth}\t${total_reads}\t${mapped_reads}\t${properly_paired}\t${alignment_percentage}" >> "${overall_coverage}"
         fi
 
+
+        # Variant calling with bcftools mpileup + call
+        logmsg  "mpileup and variant calling ${bam_out} against ${gbase} started."
+        if [[ -s "${vcf_out}" ]]; then
+            logmsg "${vcf_out} already exists. Skipping."
+        else
+            if ! bcftools mpileup --ignore-RG -f "${genome_fa}" "${bam_out}" --threads "${threads}" \
+                | bcftools call -m -v -Oz --threads "${threads}" -o "${vcf_out}"; then
+                logmsg "bcftools mpileup for ${tag} failed"
+                continue
+            fi
+            logmsg "mpileup and variant calling for ${tag} completed."
+        fi
+
+        if [[ -s "${vcf_out}.csi" || -s "${vcf_out}.tbi" ]]; then
+            logmsg "VCF index for ${vcf_out} already exists. Skipping indexing."
+        else
+            # index vcf files
+            logmsg "indexing ${vcf_out} started."
+            if ! bcftools index "${vcf_out}"; then
+                logmsg "bcftools index for ${vcf_out} failed"
+                continue
+            fi
+            logmsg "indexing ${vcf_out} completed."
+        fi
+
+        # bcftool stats
+        local bstats="${stats_dir}/${tag}_bcfstats.tsv"
+        logmsg "Generating stats for VCF: ${vcf_out}"
+        if [[ -s ${bstats} ]]; then
+            logmsg "Stats file already exists: ${bstats}."
+        else
+            if ! bcftools stats "${vcf_out}" > "${bstats}"; then
+                logmsg "ERROR: bcftools stats failed on ${vcf_out}"
+                continue
+            else 
+                logmsg "bcftools stats written to ${bstats}."
+            fi     
+        fi
+
+        # Statistics and Plotting
+        local bplots="${plots_dir}/${tag}_plots"
+        logmsg "Plotting stats from ${bstats}."
+
+        if [[ -d ${bplots} ]]; then
+            logmsg "Plots directory already exists: ${bplots}."
+        else
+            if ! plot-vcfstats -t "${tag}" -p "${bplots}" "${bstats}"; then
+                logmsg "WARNING: plot-vcfstats failed for ${bstats}."
+            else
+                logmsg "Plots generated in ${bplots}."
+            fi 
+        fi
+
+        # decompress .vcf.gz and pipe to bcftools
+        local snp_table="${snps_tsv}/${tag}_snps.tsv"
+        logmsg "Creating the Final SNP table for ${snp_table} started."
+
+        if [[ -s ${snp_table} ]]; then
+            logmsg "${snp_table} already exists. Skipping."
+        else
+            echo -e "CHROM\tPOS\tREF\tALT\tQUAL\tDP\tFref\tRref\tFalt\tRalt" > "${snp_table}"
+
+            if bgzip -d -c "${vcf_out}" | grep -E '^#|^chr[0-9]+\b' | 
+                bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%QUAL\t%DP\t[%DP4{0}]\t[%DP4{1}]\t[%DP4{2}]\t[%DP4{3}]\n' >> "${snp_table}"; then
+                logmsg "SNP table created for ${vcf_out}."
+            else
+                logmsg "bcf filter for ${tag} failed"
+                continue
+            fi
+        fi
     done
 }
