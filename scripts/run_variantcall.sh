@@ -360,8 +360,7 @@ map_reads(){
         if [[ "${read_type}" == "PE" ]]; then
             logmsg "PE mapping ${sbase} to ${gbase} started"
 
-            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" "${O2}" |
-                samtools sort -@ "${threads}" -o "${bam_out}"; then
+            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" "${O2}" | samtools sort -@ "${threads}" -o "${bam_out}"; then
 
                 logmsg "PE alignment and sorting of ${bam_out} completed"
             else
@@ -373,8 +372,7 @@ map_reads(){
         else
             logmsg "SE mapping ${sbase} to ${gbase} started"
 
-            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" |
-                samtools sort -@ "${threads}" -o "${bam_out}"; then
+            if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" | samtools sort -@ "${threads}" -o "${bam_out}"; then
 
                 logmsg "SE alignment and sorting for ${bam_out} completed"
             else
@@ -395,8 +393,7 @@ map_reads(){
 
         logmsg "Read mapping completed for ${sbase}"
 
-        if awk -F '\t' -v genome="${gbase}" -v sample="${sbase}" \
-            '$1 == genome && $2 == sample {found=1} END {exit !found}'\
+        if awk -F '\t' -v genome="${gbase}" -v sample="${sbase}" '$1 == genome && $2 == sample {found=1} END {exit !found}'\
             "${overall_coverage}"; then
 
             logmsg "Coverage for ${tag} already present. Skipping stats.."
@@ -408,15 +405,12 @@ map_reads(){
             stats=$(samtools flagstat "${bam_out}")
 
             # Extract read statistics
-            total_reads=$(echo "${stats}" |
-            awk '/in total/ {print $1; exit}')
+            total_reads=$(echo "${stats}" | awk '/in total/ {print $1; exit}')
 
-            mapped_reads=$(echo "${stats}" |
-            awk '$4 == "mapped" {print $1; exit}')
+            mapped_reads=$(echo "${stats}" | awk '$4 == "mapped" {print $1; exit}')
 
             if [[ ${read_type} == "PE" ]]; then
-                properly_paired=$(echo "${stats}" |
-                    awk '/properly paired/ {print $1; exit}')
+                properly_paired=$(echo "${stats}" | awk '/properly paired/ {print $1; exit}')
             else
                 # For single-end data, paired reads are not applicable
                 properly_paired="NA"
@@ -429,8 +423,7 @@ map_reads(){
             fi
 
             local alignment_percentage
-            if alignment_percentage=$(awk -v total="${total_reads}" -v mapped="${mapped_reads}" \
-                'BEGIN {printf "%.2f", (mapped/total)*100}'); then
+            if alignment_percentage=$(awk -v total="${total_reads}" -v mapped="${mapped_reads}" 'BEGIN {printf "%.2f", (mapped/total)*100}'); then
                 logmsg "Aignment percentage calculated"
             fi
 
@@ -443,8 +436,7 @@ map_reads(){
             fi
 
             # Append structured tab-separated results
-            echo -e "${gbase}\t${sbase}\t${read_type}\t${depth}\t${total_reads}\t\
-            ${mapped_reads}\t${properly_paired}\t${alignment_percentage}" >> "${overall_coverage}"
+            echo -e "${gbase}\t${sbase}\t${read_type}\t${depth}\t${total_reads}\t${mapped_reads}\t${properly_paired}\t${alignment_percentage}" >> "${overall_coverage}"
         fi
 
     done
