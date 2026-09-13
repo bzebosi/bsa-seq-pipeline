@@ -323,8 +323,7 @@ map_reads(){
 
     # Initialize coverage summary
     if [[ ! -s "${overall_coverage}" ]]; then
-        if echo -e "Genome\tSample\tRead_Type\tCoverage\tTotal_Reads\tMapped_Reads\t\
-            Properly_Paired\tMapped_%" > "${overall_coverage}"; then
+        if echo -e "Genome\tSample\tRead_Type\tCoverage\tTotal_Reads\tMapped_Reads\tProperly_Paired\tMapped_%" > "${overall_coverage}"; then
 
             logmsg "Successfully created ${overall_coverage}"
         else
