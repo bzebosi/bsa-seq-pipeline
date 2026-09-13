@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # load your settings:
-source "$(dirname "$0")/variant_call_config.sh"
+source "$(dirname "$0")/variant_config.sh"
 
 # -------------------------------------------------------------------------------------------------------
 # log functions for updates and status
