@@ -11,7 +11,7 @@
 
 # Define variables
 env_name="variantcall_packages"
-script=/nfs5/BPP/Leiboff_Lab/Brian/scripts/BSA_Seq/linux_script/run_variant.sh
+script=/nfs5/BPP/Leiboff_Lab/Brian/scripts/bsa-seq-pipeline/scripts/run_variant.sh
 
 # Make allocated CPUs available to pipeline
 export threads="${SLURM_CPUS_PER_TASK:-8}"
