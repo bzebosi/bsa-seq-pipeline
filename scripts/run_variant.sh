@@ -286,7 +286,7 @@ trim_reads(){
 # Map Reads 
 # -------------------------------------------------------------------------------------------------------
 
-map_reads(){
+    map_reads(){
     local project=$1
     local gbase=$2
     local project_dir=$(get_project_dir "${project}") || return 1
@@ -301,13 +301,13 @@ map_reads(){
     local snps_dir=${project_dir}/snps_variants
     local snps_vcf=${snps_dir}/snps_vcf
     local snps_tsv=${snps_dir}/snps_tsv
-    
+
     local svs_dir=${project_dir}/svs_variants
     local svs_vcf=${svs_dir}/svs_vcf
     local svs_tsv=${svs_dir}/svs_tsv
 
 
-    create_dir "${bam_dir}" "${stats_dir}" "${reports_dir}" "${plots_dir}" "${variant_dir}" || return 1
+    create_dir "${bam_dir}" "${stats_dir}" "${reports_dir}" "${plots_dir}" || return 1
     create_dir "${snps_dir}" "${snps_vcf}" "${snps_tsv}" "${svs_dir}" "${svs_vcf}" "${svs_tsv}" || return 1
     # create reference paths
     local idx_mmi=${idx_dir}/${gbase}.mmi
