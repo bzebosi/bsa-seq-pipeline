@@ -238,6 +238,8 @@ trim_reads(){
         fi
 
         # Run fastp
+
+        logmsg "Starting fastp for ${sbase} (${read_type})"
         if [[ "${read_type}" == "PE" ]]; then
             if [[ ! -s "${O1}" || ! -s "${O2}" || ! -s "${jt}" ]]; then
                 if fastp -i ${R1} -I ${R2} -o ${O1} -O ${O2} --detect_adapter_for_pe \
@@ -249,11 +251,9 @@ trim_reads(){
                 fi
             else
                 logmsg "$(basename "${O1}") and $(basename "${O1}") already exist and trimmed. skip fastp..."
-                
             fi
 
         else
-
             if [[ ! -s "${O1}" || ! -s "${jt}" ]]; then
                 if fastp -i ${R1} -o ${O1} --thread ${threads} -h ${ht} -j ${jt} ; then
                     logmsg "fastp complete for ${sbase}"
