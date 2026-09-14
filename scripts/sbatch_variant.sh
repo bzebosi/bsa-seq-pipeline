@@ -1,8 +1,7 @@
 #!/bin/bash
 
 #SBATCH --nodes=1  # Number of tasks
-#SBATCH --ntasks=1 # Number of cores
-#SBATCH --cpus-per-task=190   # Number of cores
+#SBATCH --cpus-per-task=8   # Number of cores
 #SBATCH --output="variantcall_%j.out"
 #SBATCH --error="variantcall_%j.error"
 #SBATCH -A leiboff_lab           # Lab account (priority)
