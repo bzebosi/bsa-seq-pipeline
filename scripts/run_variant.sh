@@ -299,10 +299,10 @@ map_reads(){
     local plots_dir=${stats_dir}/plots
 
     local variant_dir=${project_dir}/variants
-    local snps_dir=${variant_dir}/snps
+    local snps_dir=${variant_dir}/snps_variants
     local snps_vcf=${snps_dir}/snps_vcf
     local snps_tsv=${snps_dir}/snps_tsv
-    local svs_dir=${variant_dir}/svs
+    local svs_dir=${variant_dir}/svs_variants
     local svs_vcf=${svs_dir}/svs_vcf
     local svs_tsv=${svs_dir}/svs_tsv
 
@@ -320,7 +320,7 @@ map_reads(){
     fi
 
     # Check if overall coverage file exists, create if missing
-    local overall_coverage="${stats_dir}/overall_coverage.tsv"
+    local overall_coverage="${reports_dir}/overall_coverage.tsv"
 
     # Initialize coverage summary
     if [[ ! -s "${overall_coverage}" ]]; then
@@ -472,7 +472,7 @@ map_reads(){
         fi
 
         # bcftool stats
-        local bstats="${stats_dir}/${tag}_bcfstats.tsv"
+        local bstats="${reports_dir}/${tag}_bcfstats.tsv"
         logmsg "Generating stats for VCF: ${vcf_out}"
         if [[ -s ${bstats} ]]; then
             logmsg "Stats file already exists: ${bstats}."
@@ -516,7 +516,7 @@ map_reads(){
         fi
 
         if [[ ${sv_call} == "true" ]]; then
-            local manta_dir=${svs_dir}/${manta_svs}
+            local manta_dir=${svs_dir}/manta_svs
             local manta_run="${manta_dir}/${tag}_svs"
 
             # make sure all dirs exist
