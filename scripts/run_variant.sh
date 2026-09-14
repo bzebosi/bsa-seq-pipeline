@@ -298,11 +298,11 @@ map_reads(){
     local reports_dir=${stats_dir}/reports
     local plots_dir=${stats_dir}/plots
 
-    local variant_dir=${project_dir}/variants
-    local snps_dir=${variant_dir}/snps_variants
+    local snps_dir=${project_dir}/snps_variants
     local snps_vcf=${snps_dir}/snps_vcf
     local snps_tsv=${snps_dir}/snps_tsv
-    local svs_dir=${variant_dir}/svs_variants
+    
+    local svs_dir=${project_dir}/svs_variants
     local svs_vcf=${svs_dir}/svs_vcf
     local svs_tsv=${svs_dir}/svs_tsv
 
