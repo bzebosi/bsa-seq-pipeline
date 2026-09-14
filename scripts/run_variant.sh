@@ -180,23 +180,16 @@ index_genome(){
 # trim read
 # -------------------------------------------------------------------------------------------------------
 
-# Directory names
-reads_name="reads"
-fastp_name="fastp"
-trim_reads_name="trim_reads"
-reports_name="reports"
-
 trim_reads(){
     local project=$1
-    local project_dir
-    project_dir=$(get_project_dir ${project}) || return 1
-    local raw_reads_dir=${project_dir}/${reads_name}
-    local fastp_dir=${project_dir}/${fastp_name}
-    local trim_dir=${fastp_dir}/${trim_reads_name}
-    local report_dir=${fastp_dir}/${reports_name}
-    local summary=${report_dir}/fastp_summary.tsv
+    local project_dir=$(get_project_dir ${project}) || return 1
+    local reads_dir=${project_dir}/reads
+    local trim_dir=${project_dir}/trim_reads
+    local stats_dir=${project_dir}/stats
+    local reports_dir=${stats_dir}/reports
+    local summary=${reports_dir}/fastp_trim_summary.tsv
 
-    create_dir ${trim_dir} ${report_dir} || return 1
+    create_dir ${stats_dir} ${trim_dir} ${reports_dir} || return 1
 
     # Initialize summary file 
     if [[ ! -s ${summary} ]]; then
@@ -209,15 +202,15 @@ trim_reads(){
     fi
 
     local R1
-    for R1 in ${raw_reads_dir}/*_R1.fq.gz; do
+    for R1 in ${reads_dir}/*_R1.fq.gz; do
         local fname=$(basename ${R1})
 
         local sbase=${fname%_R1.fq.gz}
-        local R2=${raw_reads_dir}/${sbase}_R2.fq.gz
+        local R2=${reads_dir}/${sbase}_R2.fq.gz
         local O1=${trim_dir}/${sbase}_trim_R1.fq.gz
         local O2=${trim_dir}/${sbase}_trim_R2.fq.gz
-        local ht=${report_dir}/${sbase}_fastp_report.html
-        local jt=${report_dir}/${sbase}_fastp_report.json
+        local ht=${reports_dir}/${sbase}_fastp_report.html
+        local jt=${reports_dir}/${sbase}_fastp_report.json
         local metrics=""
         local read_type
 
@@ -250,7 +243,7 @@ trim_reads(){
                     continue
                 fi
             else
-                logmsg "$(basename "${O1}") and $(basename "${O1}") already exist and trimmed. skip fastp..."
+                logmsg "$(basename "${O1}") and $(basename "${O2}") already exist and trimmed. skip fastp..."
             fi
 
         else
@@ -296,24 +289,27 @@ trim_reads(){
 # -------------------------------------------------------------------------------------------------------
 # Map Reads 
 # -------------------------------------------------------------------------------------------------------
+
 map_reads(){
     local project=$1
     local gbase=$2
-    local project_dir
-    project_dir=$(get_project_dir "${project}") || return 1
-    local trim_dir=${project_dir}/${fastp_name}/${trim_reads_name}
+    local project_dir=$(get_project_dir "${project}") || return 1
+    local trim_dir=${project_dir}/trim_reads
     local idx_dir=${ref_dir}/indexes
-    local bam_dir=${project_dir}/${bam}
-    local stats_dir=${project_dir}/${stats}
-    local reports_dir=${stats_dir}/${reports}
-    local plots_dir=${stats_dir}/${plots}
-    local variant_dir=${project_dir}/${variants}
-    local snps_dir=${variant_dir}/${snps}
-    local snps_vcf=${snps_dir}/${snps_vcf}
-    local snps_tsv=${snps_dir}/${snps_tsv}
-    local svs_dir=${variant_dir}/${svs}
-    local svs_vcf=${svs_dir}/${svs_vcf}
-    local svs_tsv=${svs_dir}/${svs_tsv}
+    local bam_dir=${project_dir}/bam
+
+    local stats_dir=${project_dir}/stats
+    local reports_dir=${stats_dir}/reports
+    local plots_dir=${stats_dir}/plots
+
+    local variant_dir=${project_dir}/variants
+    local snps_dir=${variant_dir}/snps
+    local snps_vcf=${snps_dir}/snps_vcf
+    local snps_tsv=${snps_dir}/snps_tsv
+    local svs_dir=${variant_dir}/svs
+    local svs_vcf=${svs_dir}/svs_vcf
+    local svs_tsv=${svs_dir}/svs_tsv
+
 
     create_dir "${bam_dir}" "${stats_dir}" "${reports_dir}" "${plots_dir}" "${variant_dir}" || return 1
     create_dir "${snps_dir}" "${snps_vcf}" "${snps_tsv}" "${svs_dir}" "${svs_vcf}" "${svs_tsv}" || return 1
