@@ -491,7 +491,7 @@ map_reads(){
         if [[ -d ${bplots} ]]; then
             logmsg "Plots directory already exists: ${bplots}."
         else
-            if ! plot-vcfstats -t "${tag}" -p "${bplots}" "${bstats}"; then
+            if ! plot-vcfstats -P -t "${tag}" -p "${bplots}" "${bstats}"; then
                 logmsg "WARNING: plot-vcfstats failed for ${bstats}." && exit 1
             else
                 logmsg "Plots generated in ${bplots}."
