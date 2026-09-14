@@ -123,8 +123,7 @@ index_genome(){
         if gunzip -c ${genome_gz} > ${genome}; then
             logmsg "Unzipped genome created: ${genome}"
         else
-            logmsg "Error: Failed to unzip ${genome_gz}"
-            return 1
+            logmsg "Error: Failed to unzip ${genome_gz}" && exit 1
         fi
     fi
 
@@ -137,8 +136,7 @@ index_genome(){
         if minimap2 -t ${threads} -d ${mmi} ${genome} ; then
             logmsg "Minimap2 index completed ${mmi}"
         else
-            logmsg "Error: minimap2 index failed for ${genome}"
-            return 1
+            logmsg "Error: minimap2 index failed for ${genome}" && exit 1
         fi
     fi
 
@@ -156,8 +154,7 @@ index_genome(){
                     mv -u ${genome}.fai ${fai} && logmsg "moved ${genome}.fai to ${fai}"
                 fi
             else
-                logmsg "samtools index failed for ${gbase}. " 
-                return 1
+                logmsg "samtools index failed for ${gbase}." && exit 1 
             fi
         fi
     fi
@@ -169,8 +166,7 @@ index_genome(){
         if ln -s ${genome} ${link_fa}; then
             logmsg "Symlink created ${link_fa} for ${genome}"
         else
-            logmsg "Error: failed to created symlink for genome: ${gbase}"
-            return 1
+            logmsg "Error: failed to created symlink for genome: ${gbase}." && exit 1 
         fi
     fi
 }
@@ -320,8 +316,7 @@ map_reads(){
     if [[ -s "${idx_mmi}" && -s "${genome_fa}" ]]; then
         logmsg "Using index: ${idx_mmi} and FASTA: ${genome_fa}"
     else
-        logmsg "Error: index or FASTA missing for ${gbase}"
-        return 1
+        logmsg "Error: index or FASTA missing for ${gbase}." && exit 1 
     fi
 
     # Check if overall coverage file exists, create if missing
@@ -333,8 +328,7 @@ map_reads(){
 
             logmsg "Successfully created ${overall_coverage}"
         else
-            logmsg "Error creating ${overall_coverage}"
-            return 1
+            logmsg "Error creating ${overall_coverage}." && exit 1
         fi
     fi
 
@@ -365,8 +359,7 @@ map_reads(){
                 logmsg "BAM index missing. Indexing ${bam_out}"
 
                 if ! samtools index "${bam_out}"; then
-                    logmsg "Indexing of ${bam_out} failed"
-                continue
+                    logmsg "Indexing of ${bam_out} failed" && exit 1
                 fi
             fi
 
@@ -378,8 +371,7 @@ map_reads(){
                 if minimap2 -ax sr -t "${threads}" "${idx_mmi}" "${O1}" "${O2}" | samtools sort -@ "${threads}" -o "${bam_out}"; then
                     logmsg "PE alignment and sorting of ${bam_out} completed"
                 else
-                    logmsg "ERROR: PE mapping failed for ${bam_out}"
-                    continue
+                    logmsg "ERROR: PE mapping failed for ${bam_out}" && exit 1
                 fi
             # Map single-end reads
             else
@@ -389,8 +381,7 @@ map_reads(){
 
                     logmsg "SE alignment and sorting for ${bam_out} completed"
                 else
-                    logmsg "ERROR: SE mapping failed for ${bam_out}"
-                    continue
+                    logmsg "ERROR: SE mapping failed for ${bam_out}" && exit 1
                 fi
             fi
 
@@ -400,8 +391,7 @@ map_reads(){
             if samtools index "${bam_out}"; then
                 logmsg "${bam_out} successfully indexed"
             else
-                logmsg "Indexing of ${bam_out} failed"
-                continue
+                logmsg "Indexing of ${bam_out} failed" && exit 1
             fi
         fi
 
@@ -465,8 +455,7 @@ map_reads(){
         else
             if ! bcftools mpileup --ignore-RG -f "${genome_fa}" "${bam_out}" --threads "${threads}" \
                 | bcftools call -m -v -Oz --threads "${threads}" -o "${vcf_out}"; then
-                logmsg "bcftools mpileup for ${tag} failed"
-                continue
+                logmsg "bcftools mpileup for ${tag} failed" && exit 1
             fi
             logmsg "mpileup and variant calling for ${tag} completed."
         fi
@@ -477,8 +466,7 @@ map_reads(){
             # index vcf files
             logmsg "indexing ${vcf_out} started."
             if ! bcftools index "${vcf_out}"; then
-                logmsg "bcftools index for ${vcf_out} failed"
-                continue
+                logmsg "bcftools index for ${vcf_out} failed" && exit 1
             fi
             logmsg "indexing ${vcf_out} completed."
         fi
@@ -490,8 +478,7 @@ map_reads(){
             logmsg "Stats file already exists: ${bstats}."
         else
             if ! bcftools stats "${vcf_out}" > "${bstats}"; then
-                logmsg "ERROR: bcftools stats failed on ${vcf_out}"
-                continue
+                logmsg "ERROR: bcftools stats failed on ${vcf_out}" && exit 1
             else 
                 logmsg "bcftools stats written to ${bstats}."
             fi     
@@ -505,7 +492,7 @@ map_reads(){
             logmsg "Plots directory already exists: ${bplots}."
         else
             if ! plot-vcfstats -t "${tag}" -p "${bplots}" "${bstats}"; then
-                logmsg "WARNING: plot-vcfstats failed for ${bstats}."
+                logmsg "WARNING: plot-vcfstats failed for ${bstats}." && exit 1
             else
                 logmsg "Plots generated in ${bplots}."
             fi 
@@ -524,8 +511,7 @@ map_reads(){
                 bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%QUAL\t%DP\t[%DP4{0}]\t[%DP4{1}]\t[%DP4{2}]\t[%DP4{3}]\n' >> "${snp_table}"; then
                 logmsg "SNP table created for ${vcf_out}."
             else
-                logmsg "bcf filter for ${tag} failed"
-                continue
+                logmsg "bcf filter for ${tag} failed" && exit 1
             fi
         fi
 
@@ -548,13 +534,11 @@ map_reads(){
                 # Configure Manta and run manta
                 if ! configManta.py --bam ${bam_out} --referenceFasta "${genome_fa}" \
                     --runDir ${manta_run} > "${manta_run}/configManta_${tag}.log" 2>&1; then
-                    logmsg "Manta configuration failed for ${tag}."
-                    continue
+                    logmsg "Manta configuration failed for ${tag}." && exit 1
                 fi
 
                 if ! ${manta_run}/runWorkflow.py -m local -j ${threads} > "${manta_run}/mantaWorkflow_${tag}.log" 2>&1; then
-                    logmsg "Manta workflow failed. Check log: ${manta_run}/mantaWorkflow_${tag}.log"
-                    continue
+                    logmsg "Manta workflow failed. Check log: ${manta_run}/mantaWorkflow_${tag}.log" && exit 1
                 fi
             fi
 
