@@ -286,7 +286,7 @@ trim_reads(){
 # Map Reads 
 # -------------------------------------------------------------------------------------------------------
 
-    map_reads(){
+map_reads(){
     local project=$1
     local gbase=$2
     local project_dir=$(get_project_dir "${project}") || return 1
@@ -515,17 +515,28 @@ trim_reads(){
 
             if [[ -f "${vcfs[0]}" ]]; then
                 logmsg "Manta SVs already exist for ${tag}, skipping Manta."
+            
+            # Configure Manta and run manta
+            elif [[ -f "${manta_run}/runWorkflow.py" ]]; then
+                logmsg "Manta already configured for ${tag}. Running workflow."
+
+                if ! "${manta_run}/runWorkflow.py" -m local -j "${threads}" \
+                    > "${manta_run}/mantaWorkflow_${tag}.log" 2>&1; then
+                    logmsg "Manta workflow failed. Check log: ${manta_run}/mantaWorkflow_${tag}.log"
+                    exit 1
+                fi
             else
-                logmsg "No SV VCFs found — running Manta."
-                # Configure Manta and run manta
-                if ! configManta.py --bam ${bam_out} --referenceFasta "${genome_fa}" \
-                    --runDir ${manta_run} > "${manta_run}/configManta_${tag}.log" 2>&1; then
-                    logmsg "Manta configuration failed for ${tag}." && exit 1
+                if ! configManta.py --bam "${bam_out}" --referenceFasta "${genome_fa}" \
+                    --runDir "${manta_run}" > "${manta_run}/configManta_${tag}.log" 2>&1; then
+                    logmsg "Manta configuration failed for ${tag}."
+                    exit 1
                 fi
 
-                if ! ${manta_run}/runWorkflow.py -m local -j ${threads} > "${manta_run}/mantaWorkflow_${tag}.log" 2>&1; then
-                    logmsg "Manta workflow failed. Check log: ${manta_run}/mantaWorkflow_${tag}.log" && exit 1
-                fi
+                    if ! "${manta_run}/runWorkflow.py" -m local -j "${threads}" \
+                        > "${manta_run}/mantaWorkflow_${tag}.log" 2>&1; then
+                        logmsg "Manta workflow failed. Check log: ${manta_run}/mantaWorkflow_${tag}.log"
+                        exit 1
+                    fi
             fi
 
             # copy VCFs
