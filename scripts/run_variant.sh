@@ -484,20 +484,6 @@ trim_reads(){
             fi     
         fi
 
-        # Statistics and Plotting
-        local bplots="${plots_dir}/${tag}_plots"
-        logmsg "Plotting stats from ${bstats}."
-
-        if [[ -d ${bplots} ]]; then
-            logmsg "Plots directory already exists: ${bplots}."
-        else
-            if ! plot-vcfstats -P -t "${tag}" -p "${bplots}" "${bstats}"; then
-                logmsg "WARNING: plot-vcfstats failed for ${bstats}." && exit 1
-            else
-                logmsg "Plots generated in ${bplots}."
-            fi 
-        fi
-
         # decompress .vcf.gz and pipe to bcftools
         local snp_table="${snps_tsv}/${tag}_snps.tsv"
         logmsg "Creating the Final SNP table for ${snp_table} started."
