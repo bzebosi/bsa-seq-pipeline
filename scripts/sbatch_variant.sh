@@ -9,7 +9,7 @@
 #SBATCH -w cerebro               # Target cerebro node (optional)
 
 # Define variables
-env_name="variant_pkg"
+env_name="bsa_variant_pkgs"
 script=/nfs5/BPP/Leiboff_Lab/Brian/scripts/bsa-seq-pipeline/scripts/run_variant.sh
 
 # Make allocated CPUs available to pipeline
@@ -28,7 +28,7 @@ if ! conda env list | awk '{print $1}' | grep -Fxq "${env_name}"; then
     conda create \
         --name "${env_name}" \
         --channel conda-forge --channel bioconda --channel defaults --strict-channel-priority \
-        minimap2 fastp jq manta vcftools samtools bcftools matplotlib-base python tectonic \
+        libboost=1.85 minimap2 fastp jq manta=1.6.0clea vcftools samtools bcftools python tectonic \
         htslib seqkit gatk4 snpeff sift4g -y || {
             logmsg "ERROR: Failed to create Conda environment: ${env_name}"
             exit 1
