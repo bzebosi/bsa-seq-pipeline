@@ -9,7 +9,7 @@
 #SBATCH -w cerebro               # Target cerebro node (optional)
 
 # Define variables
-env_name="variantcall_pkg"
+env_name="variant_pkg"
 script=/nfs5/BPP/Leiboff_Lab/Brian/scripts/bsa-seq-pipeline/scripts/run_variant.sh
 
 # Make allocated CPUs available to pipeline
