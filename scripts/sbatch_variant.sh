@@ -2,8 +2,8 @@
 
 #SBATCH --nodes=1  # Number of tasks
 #SBATCH --cpus-per-task=8   # Number of cores
-#SBATCH --output="variantcall_%j.out"
-#SBATCH --error="variantcall_%j.error"
+#SBATCH --output="variant_%j.out"
+#SBATCH --error="variant_%j.error"
 #SBATCH -A leiboff_lab           # Lab account (priority)
 #SBATCH -p leiboff_lab           # Lab partition
 #SBATCH -w cerebro               # Target cerebro node (optional)
