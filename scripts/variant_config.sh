@@ -43,7 +43,7 @@ declare -A genome_urls=(
 # Available sample locations
 # ---------------------------------------------------------------------------------------------------------------------------------
 declare -A sample_loc=(
-    [q1]="/nfs5/BPP/Leiboff_Lab/Brian/bsa_seq/bds1_ts"
+    [q1]="/nfs5/BPP/Leiboff_Lab/Brian/bsa_seq/bds1"
     [q2]="/nfs5/BPP/Leiboff_Lab/Brian/bsa_seq/S348"
     [q3]="/nfs5/BPP/Leiboff_Lab/Brian/bsa_seq/S344"
 )
