@@ -44,6 +44,8 @@ declare -A genome_urls=(
 # ---------------------------------------------------------------------------------------------------------------------------------
 declare -A sample_loc=(
     [q1]="/nfs5/BPP/Leiboff_Lab/Brian/bsa_seq/bds1_ts"
+    [q2]="/nfs5/BPP/Leiboff_Lab/Brian/bsa_seq/S348"
+    [q3]="/nfs5/BPP/Leiboff_Lab/Brian/bsa_seq/S344"
 )
 
 
@@ -57,6 +59,6 @@ declare -a goi=( b73 )
 # samples to process
 # ---------------------------------------------------------------------------------------------------------------------------------
 
-declare -a samples=( q1 )
+declare -a samples=( q2 q3 )
 
 # *************** End of user setting **************************************
