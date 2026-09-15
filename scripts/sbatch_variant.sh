@@ -28,7 +28,7 @@ if ! conda env list | awk '{print $1}' | grep -Fxq "${env_name}"; then
     conda create \
         --name "${env_name}" \
         --channel conda-forge --channel bioconda --channel defaults --strict-channel-priority \
-        libboost=1.85 minimap2 fastp jq manta=1.6.0clea vcftools samtools bcftools python tectonic \
+        libboost=1.85 minimap2 fastp jq manta=1.6.0 vcftools samtools bcftools python tectonic \
         htslib seqkit gatk4 snpeff sift4g -y || {
             logmsg "ERROR: Failed to create Conda environment: ${env_name}"
             exit 1
